@@ -632,6 +632,7 @@ function renderHome() {
   const list = monthTx(S.month).sort(byNewest), days = new Map();
   for (const t of list) { if (!days.has(t.date)) days.set(t.date, []); days.get(t.date).push(t); }
   let h = '';
+  h += installNotice();
   if (!connected()) h += `<div class="notice"><p><b>Connect your Google Sheet.</b> Until then, entries stay on this phone.</p><button class="btn ghost small" data-act="settings">Connect</button></div>`;
   if (!list.length) h += `<div class="empty"><b>No entries in ${esc(monthName(S.month))}</b>Tap + to add an expense or income.</div>`;
   for (const [date, items] of days) {
@@ -1130,6 +1131,7 @@ function init() {
     else if (b.dataset.n === 'settings') openSettings();
   });
   const acts = {
+    install: () => doInstall(),
     tx: b => { const t = findTx(b.dataset.id); if (t) openTx(t); },
     settings: () => openSettings(),
     tbl: b => { S.tables[b.dataset.card] = !S.tables[b.dataset.card]; renderTab(); },
@@ -1146,6 +1148,23 @@ function init() {
   renderAll(); paintSync();
   pull();
 }
+
+/* ---------- install button (uses Chrome's own install prompt) ---------- */
+let installPrompt = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches;
+const installNotice = () => installPrompt && !standalone()
+  ? `<div class="notice"><p><b>Install this app.</b> It gets its own icon and opens full screen.</p><button class="btn ghost small" data-act="install">Install</button></div>` : '';
+async function doInstall() {
+  if (!installPrompt) return;
+  const p = installPrompt;
+  installPrompt = null;
+  p.prompt();
+  try { await p.userChoice; } catch (e) {}
+  renderAll();
+}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; renderAll(); });
+addEventListener('appinstalled', () => { installPrompt = null; renderAll(); toast('Installed. Open it from your home screen.'); });
+
 init();
 // offline copy + installable app (sw.js sits next to this file; harmless if it is missing)
 if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
